@@ -1,0 +1,355 @@
+import React, { useState } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Check, AlertCircle, Star, Timer, Users, Download, Edit2, Plus, X } from 'lucide-react';
+
+const DailyCheckout = () => {
+  const [date] = useState(new Date().toLocaleDateString());
+  const [activeTeam, setActiveTeam] = useState(1);
+  const [newItem, setNewItem] = useState('');
+  const [activeSection, setActiveSection] = useState('accomplishments');
+  const [showSummary, setShowSummary] = useState(false);
+  const [editingTeamName, setEditingTeamName] = useState(null);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newMemberName, setNewMemberName] = useState('');
+  
+  const [teamsData, setTeamsData] = useState(
+    Array.from({ length: 8 }, (_, i) => ({
+      id: i + 1,
+      name: `Team ${i + 1}`,
+      energy: 'high',
+      accomplishments: [],
+      blockers: [],
+      nextSteps: [],
+      members: [],
+      dependencies: []
+    }))
+  );
+
+  const addItem = (e) => {
+    e.preventDefault();
+    if (!newItem.trim()) return;
+
+    setTeamsData(prev => prev.map(team => 
+      team.id === activeTeam 
+        ? {
+            ...team,
+            [activeSection]: [...team[activeSection], newItem]
+          }
+        : team
+    ));
+    setNewItem('');
+  };
+
+  const removeItem = (teamId, section, index) => {
+    setTeamsData(prev => prev.map(team =>
+      team.id === teamId
+        ? {
+            ...team,
+            [section]: team[section].filter((_, i) => i !== index)
+          }
+        : team
+    ));
+  };
+
+  const updateTeamEnergy = (teamId, energy) => {
+    setTeamsData(prev => prev.map(team =>
+      team.id === teamId
+        ? { ...team, energy }
+        : team
+    ));
+  };
+
+  const startEditingTeamName = (teamId, currentName) => {
+    setEditingTeamName(teamId);
+    setNewTeamName(currentName);
+  };
+
+  const saveTeamName = (teamId) => {
+    if (newTeamName.trim()) {
+      setTeamsData(prev => prev.map(team =>
+        team.id === teamId
+          ? { ...team, name: newTeamName.trim() }
+          : team
+      ));
+    }
+    setEditingTeamName(null);
+    setNewTeamName('');
+  };
+
+  const addTeamMember = (teamId) => {
+    if (newMemberName.trim()) {
+      setTeamsData(prev => prev.map(team =>
+        team.id === teamId
+          ? { ...team, members: [...team.members, newMemberName.trim()] }
+          : team
+      ));
+      setNewMemberName('');
+    }
+  };
+
+  const removeTeamMember = (teamId, memberIndex) => {
+    setTeamsData(prev => prev.map(team =>
+      team.id === teamId
+        ? {
+            ...team,
+            members: team.members.filter((_, i) => i !== memberIndex)
+          }
+        : team
+    ));
+  };
+
+  const exportData = () => {
+    const dataStr = JSON.stringify(teamsData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `hackathon-checkout-${date}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const energyLevels = ['low', 'medium', 'high'];
+  const activeTeamData = teamsData.find(team => team.id === activeTeam);
+
+  const TeamSummary = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {teamsData.map(team => (
+        <Card key={team.id} className="p-4">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="font-semibold">{team.name}</h3>
+            <span className={`w-3 h-3 rounded-full ${
+              team.energy === 'high' ? 'bg-green-400' :
+              team.energy === 'medium' ? 'bg-yellow-400' :
+              'bg-red-400'
+            }`} />
+          </div>
+          <div className="text-sm space-y-2">
+            <div>Members: {team.members.length}</div>
+            <div>Tasks: {team.accomplishments.length + team.nextSteps.length}</div>
+            <div>Blockers: {team.blockers.length}</div>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="w-full max-w-6xl mx-auto space-y-6">
+      {/* Control Bar */}
+      <div className="flex justify-between items-center">
+        <button
+          onClick={() => setShowSummary(!showSummary)}
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+        >
+          {showSummary ? 'Show Details' : 'Show Summary'}
+        </button>
+        <button
+          onClick={exportData}
+          className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+        >
+          <Download className="w-4 h-4" />
+          Export Data
+        </button>
+      </div>
+
+      {showSummary ? (
+        <TeamSummary />
+      ) : (
+        <>
+          {/* Team Selector */}
+          <div className="flex flex-wrap gap-2">
+            {teamsData.map(team => (
+              <button
+                key={team.id}
+                onClick={() => setActiveTeam(team.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+                  activeTeam === team.id
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                {editingTeamName === team.id ? (
+                  <input
+                    type="text"
+                    value={newTeamName}
+                    onChange={(e) => setNewTeamName(e.target.value)}
+                    onBlur={() => saveTeamName(team.id)}
+                    onKeyPress={(e) => e.key === 'Enter' && saveTeamName(team.id)}
+                    className="bg-transparent border-b w-24"
+                    autoFocus
+                  />
+                ) : (
+                  <>
+                    {team.name}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEditingTeamName(team.id, team.name);
+                      }}
+                      className="ml-1 opacity-50 hover:opacity-100"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  </>
+                )}
+                <span className={`w-2 h-2 rounded-full ${
+                  team.energy === 'high' ? 'bg-green-400' :
+                  team.energy === 'medium' ? 'bg-yellow-400' :
+                  'bg-red-400'
+                }`} />
+              </button>
+            ))}
+          </div>
+
+          <Card className="w-full">
+            <CardHeader className="bg-slate-50">
+              <CardTitle className="flex justify-between items-center">
+                <span>{activeTeamData.name} Daily Checkout</span>
+                <span className="text-sm font-normal">{date}</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-6">
+              {/* Team Members */}
+              <div>
+                <h3 className="text-sm font-semibold mb-2">Team Members</h3>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {activeTeamData.members.map((member, index) => (
+                    <span 
+                      key={index}
+                      className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded"
+                    >
+                      {member}
+                      <button
+                        onClick={() => removeTeamMember(activeTeam, index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    placeholder="Add team member..."
+                    className="flex-1 p-2 border rounded"
+                    onKeyPress={(e) => e.key === 'Enter' && addTeamMember(activeTeam)}
+                  />
+                  <button
+                    onClick={() => addTeamMember(activeTeam)}
+                    className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Energy Level Selector */}
+              <div>
+                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                  <Timer className="w-4 h-4" />
+                  Team Energy Level
+                </h3>
+                <div className="flex gap-2">
+                  {energyLevels.map(level => (
+                    <button
+                      key={level}
+                      onClick={() => updateTeamEnergy(activeTeam, level)}
+                      className={`px-3 py-1 rounded-full text-sm ${
+                        activeTeamData.energy === level 
+                          ? 'bg-blue-500 text-white' 
+                          : 'bg-gray-100'
+                      }`}
+                    >
+                      {level.charAt(0).toUpperCase() + level.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Input Form */}
+              <form onSubmit={addItem} className="space-y-4">
+                <div className="flex gap-2">
+                  {[
+                    { id: 'accomplishments', icon: <Check className="w-4 h-4" />, label: 'Accomplishments' },
+                    { id: 'blockers', icon: <AlertCircle className="w-4 h-4" />, label: 'Blockers' },
+                    { id: 'nextSteps', icon: <Star className="w-4 h-4" />, label: 'Next Steps' }
+                  ].map(section => (
+                    <button
+                      key={section.id}
+                      type="button"
+                      onClick={() => setActiveSection(section.id)}
+                      className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm ${
+                        activeSection === section.id 
+                          ? 'bg-blue-500 text-white' 
+                          : 'bg-gray-100'
+                      }`}
+                    >
+                      {section.icon}
+                      {section.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newItem}
+                    onChange={(e) => setNewItem(e.target.value)}
+                    placeholder={`Add ${activeSection}...`}
+                    className="flex-1 p-2 border rounded"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    Add
+                  </button>
+                </div>
+              </form>
+
+              {/* Lists */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {[
+                  { id: 'accomplishments', icon: <Check className="w-4 h-4" />, label: 'Accomplishments' },
+                  { id: 'blockers', icon: <AlertCircle className="w-4 h-4" />, label: 'Blockers' },
+                  { id: 'nextSteps', icon: <Star className="w-4 h-4" />, label: 'Next Steps' }
+                ].map(section => (
+                  <div key={section.id}>
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                      {section.icon}
+                      {section.label}
+                    </h3>
+                    <ul className="space-y-2">
+                      {activeTeamData[section.id].map((item, index) => (
+                        <li 
+                          key={index}
+                          className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                        >
+                          <span>{item}</span>
+                          <button
+                            onClick={() => removeItem(activeTeam, section.id, index)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            ×
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default DailyCheckout;
